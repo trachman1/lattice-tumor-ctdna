@@ -1,3 +1,4 @@
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt 
@@ -14,14 +15,16 @@ import multiprocessing as mp
 NG_DNA_PER_ML = 29 #Phallen 
 NG_DNA_PER_HGE = .0033 #Avanzani and others
 HGE_PER_ML = NG_DNA_PER_ML/NG_DNA_PER_HGE
-ELIMINATION_RATE = 33 #Avanzani
+ELIMINATION_RATE = 33.3 #Avanzani
 DETECT_RADIUS = 90
 TOTAL_ML_BLOOD = 5000
 PLASMA_PER_BLOOD = .55
 TOTAL_HGE = PLASMA_PER_BLOOD*TOTAL_ML_BLOOD*HGE_PER_ML
 PLOIDY = 2
 CM_PER_VOXEL = 2e-2 #10 cells with diameter of 2e-3 cm accross 1 voxel 
-
+SHED_RATE = 1.4e-4 #Avanzini
+MUTATION_FACTOR = 100 #mu_sim/mu_real
+DETECT_SIZE_VOXELS = np.pi*(DETECT_RADIUS)**2 
 #######################################################################################################
 #helpers
 #######################################################################################################
@@ -52,7 +55,9 @@ def calc_shedding_rate(time_of_diag, comp_df, set_tumor_fraction):
     shed_rate = set_tumor_fraction*TOTAL_ML_BLOOD*HGE_PER_ML*ELIMINATION_RATE/dbar/estimate_3d_population(detect_size['popsize'])
     return shed_rate
 
-def estimate_shedding_rate(tf, d1 = .1, detect_size = 3e9):
+def estimate_shedding_rate(tf, d1 = .1):
+    detect_size = estimate_3d_population(DETECT_SIZE_VOXELS)
+    print(detect_size)
     return tf*TOTAL_HGE*ELIMINATION_RATE/detect_size/d1
 
 def get_time_of_diag(comp_df):
@@ -97,7 +102,7 @@ def clones_to_vafs(data):
     
     return mut_freqs
 
-def resample_blood_vafs(vafs, clones, set_tf, ml_blood_draw = 15):
+def resample_blood_vafs(vafs, clones, ml_blood_draw = 15, set_tf = 1e-2):
     """given an array of death rate scaled vafs, total hge, blood
     hge: pd dataframe with a single number of hge for each timepoint for each replicate
     shedrate: series with shedding rate for each replicate 
@@ -105,40 +110,48 @@ def resample_blood_vafs(vafs, clones, set_tf, ml_blood_draw = 15):
     ml_blood_draw:  constant ml blood drawn"""
     
     shedrate = estimate_shedding_rate(set_tf)
+    
     blood_fraction = ml_blood_draw/TOTAL_ML_BLOOD
+    
     vafs = vafs.set_index(['rep','t'])
     vafs['whole_tumor_mean_dr'] = clones.groupby(['rep','t'])['cellhge'].sum()/clones.groupby(['rep','t'])['popsize'].sum()
 
     
     vafs = vafs.reset_index() 
-    vafs['spatial_mut_hge'] = shedrate*blood_fraction*vafs['mean_death_rate']*vafs['tissue']*vafs['realpop']
-    vafs['nonspatial_mut_hge'] = shedrate*blood_fraction*vafs['whole_tumor_mean_dr']*vafs['realpop']*vafs['tissue']
-    #vafs = vafs.merge(realpop, on = ['rep','t'])
-    #vafs['mut_hge'] *= vafs['realpop']
+    vafs['spatial_mut_hge'] = shedrate*blood_fraction*vafs['mean_death_rate']*vafs['realpop']*vafs['tissue']/ELIMINATION_RATE
+    vafs['nonspatial_mut_hge'] = shedrate*blood_fraction*vafs['whole_tumor_mean_dr']*vafs['realpop']*vafs['tissue']/ELIMINATION_RATE
+    
     vafs['spatial_stoch_mut_hge'] = np.random.poisson(vafs['spatial_mut_hge'].values)
     vafs['nonspatial_stoch_mut_hge'] = np.random.poisson(vafs['nonspatial_mut_hge'].values)
-    total_hge = blood_fraction*TOTAL_HGE
-    total_stoch_hge = np.random.poisson(total_hge)
-    vafs['spatial_vaf'] = vafs['spatial_mut_hge']/total_hge/PLOIDY
-    vafs['nonspatial_vaf'] = vafs['nonspatial_mut_hge']/total_hge/PLOIDY
-    vafs['spatial_stoch_vaf'] = vafs['spatial_stoch_mut_hge']/total_stoch_hge/PLOIDY
-    vafs['nonspatial_stoch_vaf'] = vafs['nonspatial_stoch_mut_hge']/total_stoch_hge/PLOIDY
+    
+    
+    
+    
+
+    healthy_hge = blood_fraction*TOTAL_HGE*(1-set_tf)
+    healthy_stoch_hge = np.random.poisson(healthy_hge)
+    tumor_hge = shedrate*blood_fraction*vafs['realpop']*vafs["whole_tumor_mean_dr"]/ELIMINATION_RATE#*vafs['tissue']
+    tumor_stoch_hge = np.random.poisson(tumor_hge)
+    
+    vafs['spatial_vaf'] = vafs['spatial_mut_hge']/(healthy_hge+tumor_hge)/PLOIDY
+    vafs['nonspatial_vaf'] = vafs['nonspatial_mut_hge']/(healthy_hge+tumor_hge)/PLOIDY
+    vafs['spatial_stoch_vaf'] = vafs['spatial_stoch_mut_hge']/(healthy_stoch_hge+tumor_stoch_hge)/PLOIDY
+    vafs['nonspatial_stoch_vaf'] = vafs['nonspatial_stoch_mut_hge']/(healthy_stoch_hge+tumor_stoch_hge)/PLOIDY
 
     return vafs
 
 def get_detectable_vafs(vafs, detection_limit, min_vaf = 0, bins = None):
     largevafs = vafs[vafs['tissue']>min_vaf].copy()
     largevafs['vafdiff'] = largevafs['spatial_vaf']-largevafs['nonspatial_vaf']
-    largevafs['nonspatial_detectable'] = largevafs['nonspatial_stoch_vaf'] > detection_limit
-    largevafs['spatial_detectable'] = largevafs['spatial_stoch_vaf'] > detection_limit
+    largevafs['nonspatial_detectable'] = largevafs['nonspatial_vaf'] > detection_limit
+    largevafs['spatial_detectable'] = largevafs['spatial_vaf'] > detection_limit
     detectable = pd.DataFrame()
     detectable[['rep','t','spatial_count']] = largevafs.groupby(['rep','t'])['spatial_detectable'].sum().reset_index()
     detectable['nonspatial_count'] = largevafs.groupby(['rep','t'])['nonspatial_detectable'].sum().reset_index()['nonspatial_detectable']
     detectable['spatial_pct'] = 100*detectable['spatial_count']/((largevafs.groupby(['rep','t'])['spatial_detectable'].count()).reset_index()['spatial_detectable'])
     detectable['nonspatial_pct'] = 100*detectable['nonspatial_count']/((largevafs.groupby(['rep','t'])['nonspatial_detectable'].count()).reset_index()['nonspatial_detectable'])
     detectable['diff'] = detectable['spatial_count']-detectable['nonspatial_count']
-    detectable['pctdiff'] = 100*detectable['diff']/detectable['nonspatial_count']
-    detectable['ratio'] = detectable['spatial_count']/detectable['nonspatial_count']
+    detectable['pctdiff'] = 100*detectable['diff']/(detectable['nonspatial_count']+1e-10) #clip 0 in denom to small number 
     detectable = detectable.set_index(['rep','t'])
     detectable['realpop'] = vafs.groupby(['rep','t'])['realpop'].mean()
     detectable = detectable.reset_index()
@@ -165,8 +178,8 @@ def inv_simpson_ind(vec):
         return 0
     return 1/(np.power(vec, 2).sum())
 
-def get_peak_bias_size(vafs, thresh):
-    detectable = get_detectable_vafs(vafs, detection_limit=thresh, bins = 50)
+def get_peak_bias_size(vafs, thresh, bins = 60):
+    detectable = get_detectable_vafs(vafs, detection_limit=thresh, bins = bins)
     #detectable = detectable.groupby(['rep','realpop_binned'])['pctdiff'].mean().reset_index()
     detectable = detectable.groupby(['realpop_binned'])['pctdiff'].mean().reset_index()
     return detectable['realpop_binned'].iloc[detectable['pctdiff'].argmax()]
@@ -285,24 +298,26 @@ def make_diff_plots(data_dict, min_t = 0, nbins = 100, xname = "realpop"):
         plt.show()
         plt.close()
 
-def plot_div(data, label, xname):
+def plot_div(data, label, xname, legend = True, labels = True):
     print(f'plotting div lineplot for \n{display_label(label)}')
     for_line = data[[xname, 'tiss_whole_div', 'bl_whole_div']]
     for_line.columns = [xname, 'tissue', 'blood']
     for_line_melted = pd.melt(for_line, id_vars = [xname], value_vars = ['tissue','blood']) #hue_kws = {'label': {'tiss_whole_div'}})
-    sns.lineplot(data = for_line_melted, x = xname, y = 'value', hue = 'variable', err_style = 'band', errorbar = 'sd', palette = ['b', 'r'], legend = True)
+    sns.lineplot(data = for_line_melted, x = xname, y = 'value', hue = 'variable', err_style = 'band', errorbar = 'sd', palette = ['b', 'r'], legend = legend)
     #for_scatter = data[['realpop', 'tiss_whole_div', 'bl_whole_div']]
     #for_scatter.columns = ['realpop', 'tissue', 'blood']
     #for_scatter_melted = pd.melt(for_scatter, id_vars = ['realpop'], value_vars = ['tissue','blood'])
     #sns.scatterplot(for_scatter_melted, x = 'realpop',y = 'value', hue = 'variable',palette = ['b', 'r'], legend = False, alpha = .1) 
     plt.yticks(fontsize = 'xx-large')
-    plt.title('Blood vs Tissue ITH')
-    plt.ylabel('Inv. Simpson D')
+    plt.xticks(fontsize = 'xx-large')
+    plt.title('Blood vs Tissue ITH') if labels else plt.title("")
+    plt.ylabel('Inv. Simpson D') if labels else plt.ylabel("")
+    
     if xname == "realpop_binned":
         plt.xscale("log")
-        plt.xlabel("Tumor Size")
+        plt.xlabel("Tumor Size") if labels else plt.xlabel("")
     else:
-        plt.xlabel("normalized time")
+        plt.xlabel("normalized time") if labels else plt.xlabel("")
     #plt.ylim([0,27])
     #plt.grid(color = 'gray', linestyle = '--')
     
@@ -313,7 +328,7 @@ def plot_div(data, label, xname):
     plt.show()
     plt.close()
 
-def make_diversity_plots(data_dict, min_t = 0, nbins = 50, xname = "realpop"):
+def make_diversity_plots(data_dict, min_t = 0, nbins = 50, xname = "realpop", legend = True, labels = True):
     for label in data_dict.keys():
         data = data_dict[label]["data"].copy()
         data = data[(data["t"] >= min_t) & (data["realpop"] <= 1e10)]
@@ -335,9 +350,9 @@ def make_diversity_plots(data_dict, min_t = 0, nbins = 50, xname = "realpop"):
         mean_resampled = data.groupby(['rep',xname_binned, "genotype"])[['blood','tissue']].mean().reset_index()
        
         to_plot = get_div(mean_resampled, xname_binned)
-        plot_div(to_plot, label, xname = xname_binned)
+        plot_div(to_plot, label, xname = xname_binned, legend = legend, labels = labels)
 
-def make_detection_plots(data_dict, y, thresholds = [1e-5,1e-4,1e-3,1e-2], min_t = 0, min_pop = 0,plot_group = '-dep', xname = "realpop",nbins = 100): 
+def make_detection_plots(data_dict, y, thresholds = [1e-5,1e-4,1e-3,1e-2], min_t = 0, min_pop = 0,plot_group = '-dep', xname = "realpop",nbins = 100, axlabels = True): 
     """makes plots of either number or percentage of detectable driver mutations over either 
     population size or time. One plot contains all driver-dependent or driver-independent simulations for a 
     given detection threshold"""
@@ -357,7 +372,7 @@ def make_detection_plots(data_dict, y, thresholds = [1e-5,1e-4,1e-3,1e-2], min_t
                 if xname == "realpop":
                     bins = np.logspace(np.log10(data['realpop'].min()),np.log10(data['realpop'].max()),nbins)
                     plt.xscale("log")
-                    plt.xlim([1e7,1e10])
+                    #plt.xlim([1e7,1e10])
                 elif xname == "norm_t":
                     #renormalize time with 1e10 cutoff
                     detectable['norm_t'] = detectable.groupby('rep')['t'].transform(lambda x: x/x.max())
@@ -368,18 +383,26 @@ def make_detection_plots(data_dict, y, thresholds = [1e-5,1e-4,1e-3,1e-2], min_t
                     exit()
                 detectable[xname_binned] = pd.cut(detectable[xname], bins = bins).apply(lambda x: np.round(x.mid,2)).astype(float)
                 detectable = detectable.groupby(['rep',xname_binned])[y].mean().reset_index()
-
-                sns.lineplot(data = detectable, x = xname_binned, y = y,label = label, errorbar = 'sd',legend=False,linewidth = 2)
-                
+                try:
+                    sns.lineplot(data = detectable, x = xname_binned, y = y,label = label, errorbar = 'sd',legend=False,linewidth = 2)
+                except:
+                    print(y)
+                    print(detectable)
+                    sys.exit()
                 plt.title(f"detection limit = {threshold}")
                
                 plt.ylabel(f" {y} detectable driver mutations")
                 plt.xlabel("tumor size")
                 plt.xticks(fontsize = 'xx-large')
                 plt.yticks(fontsize = 'xx-large')
+
                 
         #plt.savefig(f"detection{plot_group}-{xname}-{y}-lim-{threshold}.png")
         #plt.savefig(f"detection{plot_group}-{xname}-{y}-lim-{threshold}.pdf")
+        if not axlabels:
+            plt.xlabel('')
+            plt.ylabel('')
+            plt.title('')
         plt.show()
         plt.close() 
         
@@ -406,16 +429,17 @@ def make_vafratio_plots(data_dict):
         plt.savefig("")
     plt.show()
 
-def make_vaf_centroid_plot(data_dict, min_t = 100, outdir = 'fig-data'):
+def make_vaf_centroid_plot(data_dict, min_t = 100, outdir = 'fig-data',thresholds = [1e-4, 1e-3], bins = 60, labels = True):
     
     for label in data_dict.keys():
         
-        for thresh in [1e-4, 1e-3]:
+        for thresh in thresholds:
             print(f"plotting spatial vaf distribution at peak bias for \n{display_label(label)}, detection limit = {thresh}")
             comp = data_dict[label]["data"] #comparison data (clone fractions)
             vafs = data_dict[label]["vafs"] #vaf data
+            vafs["is_clonal"] = (vafs["tissue"] > .99)
             r = float(label.split("-")[4]) #sanctuary radius
-            max_bias_size = get_peak_bias_size(vafs[vafs['t']>min_t], thresh)#get max bias population size 
+            max_bias_size = get_peak_bias_size(vafs[vafs['t']>min_t], thresh, bins = 60)#get max bias population size 
             #print(max_bias_size)
             to_plot = []
             vaf_subset = []
@@ -436,34 +460,38 @@ def make_vaf_centroid_plot(data_dict, min_t = 100, outdir = 'fig-data'):
             vafsub = vafsub.set_index(['rep','t','drivers'])
             vafsub['centroid'] = vaf_centroids
             vafsub = vafsub.reset_index()
-            vafsub['vafratio'] = vafsub['spatial_vaf']/(vafsub['nonspatial_vaf']+1e-10)
-            vafsub['1/vafratio'] = vafsub['nonspatial_vaf']/(vafsub['spatial_vaf']+1e-10)
+           
             vafsub['centroid_real'] = vafsub['centroid']*CM_PER_VOXEL
-            vafsub['fold'] = np.log2(vafsub['vafratio']+1e-10)
-            vafsub['negfold'] = -vafsub['fold']
             
-            maxsize = vafsub[vafsub['spatial_vaf']>1e-6]['vafratio'].max()
             
-            vafsub['binned_cent'] = pd.cut(vafsub['centroid'], 20).apply(lambda x: np.round(x.mid,2)).astype(float)*2e-2
-            sns.scatterplot(data = vafsub[vafsub['spatial_vaf']>1e-6], x = 'centroid_real', y = 'spatial_vaf', color = 'red', alpha = .2, size = "vafratio", size_norm = (.5,maxsize),sizes = (10,100) , legend = "brief")
-            sns.scatterplot(data = vafsub[vafsub['nonspatial_vaf']>1e-6], x = 'centroid_real', y = 'nonspatial_vaf', color = 'blue', alpha = .2, size = "1/vafratio", size_norm = (.5,maxsize), sizes = (10,100),  legend = None)#, size = "1/vafratio", legend = None)
-            plt.legend(title = f"VAF Ratio")
-            plt.yscale("log")
-            plt.ylim([1e-6, 1e-1])
-            plt.hlines([1e-5, 1e-4, 1e-3],xmin = 0, xmax = vafsub['centroid_real'].max(), linestyles = ['--'], colors = ['k'], label = "detection limit")
-            plt.vlines([r*2e-2], ymin = 1e-6,ymax = 1e-1, colors = ["gray"], label = "sanctuary radius")
-            plt.ylabel("VAF")
+            
 
-            plt.xlabel("distance from tumor center (cm)")
+            vafsub['binned_cent'] = pd.cut(vafsub['centroid'], 20).apply(lambda x: np.round(x.mid,2)).astype(float)*2e-2
+            sns.scatterplot(data = vafsub[vafsub['spatial_vaf']>(min(thresholds)/10)], x = 'centroid_real', y = 'spatial_vaf', color = 'seagreen', alpha = .2)
+            sns.scatterplot(data = vafsub[vafsub['nonspatial_vaf']>(min(thresholds)/10)], x = 'centroid_real', y = 'nonspatial_vaf', color = 'royalblue', alpha = .2)
+            sns.scatterplot(data = vafsub[vafsub["is_clonal"]], x = 'centroid_real', y = 'nonspatial_vaf', color = 'black', alpha = .4)
+            
+            plt.yscale("log")
+            plt.ylim([min(thresholds)/10, max(thresholds)*10])
+            plt.hlines(thresholds,xmin = 0, xmax = vafsub['centroid_real'].max(), linestyles = ['--'], colors = ['k'], label = "detection limit")
+            plt.vlines([r*2e-2], ymin = 1e-5,ymax = 1e-1, colors = ["gray"], label = "sanctuary radius")
+            if labels:
+                plt.ylabel("VAF")
+                plt.xlabel("distance from tumor center (cm)")
+            else:
+                plt.ylabel("")
+                plt.xlabel("")
             plt.xticks(fontsize = 'xx-large')
             plt.yticks(fontsize = 'xx-large')
             #plt.savefig(f"{outdir}/vaf-snapshot-{label}-{thresh}.pdf")
             plt.show()
            
 
-def load_data_files(selection = "birthbased", calibration_tumor_fraction = 1e-4):
+def load_data_files(selection = "birthbased", calibration_tumor_fraction = 1e-2):
+    #set_tf = (estimate_3d_population(DETECT_SIZE_VOXELS))*SHED_RATE*0.1/(33.3)/TOTAL_HGE
     set_tf = calibration_tumor_fraction
     sr = estimate_shedding_rate(set_tf)
+    print(f"estimated_shedding_rate = {sr}")
     data_dict = {}
     print("loading data")
     for dependence in ["dep","ind"]:
@@ -497,12 +525,11 @@ def load_data_files(selection = "birthbased", calibration_tumor_fraction = 1e-4)
         comp_reset = comp.reset_index()
         data_dict[label]["data"] = comp_reset
         #tdiag = get_time_of_diag(comp)
-        sr = estimate_shedding_rate(set_tf)#calc_shedding_rate(tdiag, comp, set_tf)
         data_dict[label]['shedrates'] = sr
         df = data_dict[label]["data"]
         #df.to_csv(f'{data_dict[label]["datadir"]}/comp-tfs.csv')
         original_vafs = clones_to_vafs(df)
-        vafs = resample_blood_vafs(original_vafs, df, set_tf = set_tf)
+        vafs = resample_blood_vafs(original_vafs, df, ml_blood_draw = 15, set_tf = set_tf)
         data_dict[label]['vafs'] = vafs
         #print(f"writing {label} to files")
         #vafs.to_csv(f'{data_dict[label]["datadir"]}/comp-vafs.csv')
