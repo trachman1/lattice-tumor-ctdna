@@ -5,12 +5,12 @@ dependencies: `python3 v11, numpy, pandas, matplotlib, seaborn`
 `classes.py`: class definitions for the lattice simulation\
 `main.py`: wrapper functions to configure parameters and call the simulator\
 `utils.py`: various helper functions and plotters\
-`demo.ipynb`: notebook showing an example run of the simulator and the resulting trajectory of ctDNA, tissue clone fractions and overall population. The results are stored in `demo-output`. The file `demo-output/simulation-results.csv` follows the formatting described in the Data section. 
+`demo.ipynb`: notebook showing an example run of the simulator and the resulting trajectory of ctDNA, tissue clone fractions and overall population. The results are stored in `demo-output`. The file `simulation-results.csv` contain data for each individual cell at each saved timepoint. The file `demo-output/postprocessed/postprocessed.csv` follows the formatting described in the Data section. 
 ## Code to reproduce figures:
 `make_figs.py`: code to produce subfigures used in all results and supplementary material\
-`code-for-figures.ipynb`: notebook that loads raw data and runs the methods in make_figs.py to produce all subfigures. 
+`code-for-figures.ipynb`: notebook that loads raw data and runs the methods in `make_figs.py` to produce all subfigures. 
 ## Data:
-the raw data used to produce all results in the paper are stored in `figure-data.tgz` which is 900MB compressed and 3.6GB uncompressed. 
+The raw data used to produce all results in the paper are stored in `figure-data.tgz` which is 900MB and 3.6GB unpacked. 
 
 The folder `figure-data` contains all raw simulation output in .csv format.
 Each folder has a naming structure identifying the simulation scenario:
