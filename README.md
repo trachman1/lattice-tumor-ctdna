@@ -14,7 +14,7 @@ The raw data used to produce all results in the paper are stored in `figure-data
 
 The folder `figure-data` contains all raw simulation output in .csv format.
 Each folder has a naming structure identifying the simulation scenario:
-\<type of selection\>-driv-\<dependent or independent\>-r-\<sanctuary radius\>-<\quiescent or non-quiescent\> 
+\<type of selection\>-driv-\<dependent or independent\>-r-\<sanctuary radius\>-\<quiescent or non-quiescent\> 
 
 so that "birthbased-driv-dep-r-60-nq" is a simulation run with selection on birth, driver-dependent invasion, sanctuary site radius of 60 voxels, non-quiescent (proliferative). 
 
