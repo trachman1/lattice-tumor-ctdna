@@ -21,21 +21,21 @@ so that "birthbased-driv-dep-r-60-nq" is a simulation run with selection on birt
 Each folder contains a single .csv called `results.csv`
 
 Each row in `results.csv` contains the data for a specific clone per replicate per timestamp. 
-The columns are: 
-	**rep**: replicate number\ 
+The columns are:\
+	**rep**: replicate number\
 	**t**: simulation timestamp\ 
-	**genotype**: genotype number \
-	**tissue**: tissue frequency \
-	**blood**: blood frequency \
-	**popsize**: population of the overall tumor \
-	**cellhge**: death rate scaled population size \
-	**diff**: difference between blood and tissue clone fraction \
-	**norm_t**: normalized timestamp \
-	**norm_t_binned**: binned normalized timestamp \
-	**r_mean**: mean radius of clone from tumor center \
-	**r_std**: standard deviation of clone from tumor center \
-	**centroid_x**: the mean x coordinate of the tumor clone \
-	**centroid_y**: the mean y coordinate of the tumor clone \
-	**centroid_r**: the mean displacement of the tumor clone from the center \ 
-	**norm_age**: normalized age of clone \
-	**drivers**: tuple of driver mutation IDs in this clone` 
+	**genotype**: genotype number\
+	**tissue**: tissue frequency\
+	**blood**: blood frequency\
+	**popsize**: population of the overall tumor\
+	**cellhge**: death rate scaled population size\
+	**diff**: difference between blood and tissue clone fraction\
+	**norm_t**: normalized timestamp\
+	**norm_t_binned**: binned normalized timestamp\
+	**r_mean**: mean radius of clone from tumor center\
+	**r_std**: standard deviation of clone from tumor center\
+	**centroid_x**: the mean x coordinate of the tumor clone\
+	**centroid_y**: the mean y coordinate of the tumor clone\
+	**centroid_r**: the mean displacement of the tumor clone from the center\ 
+	**norm_age**: normalized age of clone\
+	**drivers**: tuple of driver mutation IDs in this clone\
