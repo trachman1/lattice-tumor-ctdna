@@ -5,7 +5,7 @@ dependencies: `python3 v11, numpy, pandas, matplotlib, seaborn`
 `classes.py`: class definitions for the lattice simulation\
 `main.py`: wrapper functions to configure parameters and call the simulator\
 `utils.py`: various helper functions and plotters\
-`demo.ipynb`: notebook showing an example run of the simulator and the resulting trajectory of ctDNA, tissue clone fractions and overall population. The results are stored in `demo-output`. The file `simulation-results.csv` contain data for each individual cell at each saved timepoint. The file `demo-output/postprocessed/postprocessed.csv` follows the formatting described in the Data section. 
+`demo.ipynb`: notebook showing an example run of the simulator and the resulting trajectory of ctDNA, tissue clone fractions and overall population. The results are stored in `demo-output`. The file `simulation-results.csv` contain data for each individual cell at each saved timepoint. The file `demo-output/postprocessed/postprocessed.csv` summarizes the results for each clone as described in the Data section. 
 ## Code to reproduce figures:
 `make_figs.py`: code to produce subfigures used in all results and supplementary material\
 `code-for-figures.ipynb`: notebook that loads raw data and runs the methods in `make_figs.py` to produce all subfigures. 
