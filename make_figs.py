@@ -22,7 +22,6 @@ PLASMA_PER_BLOOD = .55
 TOTAL_HGE = PLASMA_PER_BLOOD*TOTAL_ML_BLOOD*HGE_PER_ML
 PLOIDY = 2
 CM_PER_VOXEL = 2e-2 #10 cells with diameter of 2e-3 cm accross 1 voxel 
-SHED_RATE = 1.4e-4 #Avanzini
 MUTATION_FACTOR = 100 #mu_sim/mu_real
 DETECT_SIZE_VOXELS = np.pi*(DETECT_RADIUS)**2 
 #######################################################################################################
@@ -42,7 +41,7 @@ def get_peak_t(t, popsize):
 def estimate_3d_population(n_voxels, mutation_factor = 100):
     """function to estimate the number of cells in the tumor given a 2D cross-section of voxels
     This assumes that the 2D tumor is approximately the great circle of a spherical tumor, 
-    and that the mutation factor is the number of cells (in 2d) per voxel"""
+    and that the mutation factor is the number of cells (in 2D) per voxel"""
     n_real = (4/3)*np.pi*np.power(mutation_factor*n_voxels/np.pi, 3/2)
     return n_real
 
@@ -57,7 +56,7 @@ def calc_shedding_rate(time_of_diag, comp_df, set_tumor_fraction):
 
 def estimate_shedding_rate(tf, d1 = .1):
     detect_size = estimate_3d_population(DETECT_SIZE_VOXELS)
-    print(detect_size)
+    #print(detect_size)
     return tf*TOTAL_HGE*ELIMINATION_RATE/detect_size/d1
 
 def get_time_of_diag(comp_df):
@@ -167,7 +166,6 @@ def get_div(data, xname):
     data['bl_whole_div'] = data.groupby(['rep',xname])['blood'].transform(inv_simpson_ind)
     return data
 
-
 def inv_simpson_ind(vec):
     cutoff  = 0
     """input: vector of frequencies.
@@ -204,60 +202,6 @@ def plot_relapse_time(data_dict):
     endtimes = pd.concat(dfs)
     sns.boxplot(endtimes, y = "tmax")
 
-def plot_tumor_fraction(data_dict):
-    
-    fig, (ax1, ax2) = plt.subplots(nrows = 1, ncols = 2)
-    fig2, ax21  = plt.subplots(1,1)
-    for label, color in zip(data_dict.keys(), ['r-','y-', 'g-', 'b-','r--','y--', 'g--', 'b--']):
-        print(label)
-        comp = data_dict[label]["data"]
-       
-        # get the index of median column in the original dataframe
-    
-        pop_size = estimate_3d_population(comp.reset_index().groupby(['rep','t'])['popsize'].sum()).reset_index().set_index(['rep','t'])#replace with med_df for normalized time plots
-        tfs = calc_tumor_fraction(comp, sr)
-        tf_col = tfs[['rep','t','n_hge','tf']].set_index(['rep','t'])
-        comp = comp.set_index(['rep','t'])
-        comp[['n_hge','tf']] = tf_col
-        comp['log10_n_hge'] = np.log10(comp['n_hge'])
-        comp['log10_tf'] = np.log10(comp['tf'])
-        comp['realpop'] = pop_size
-        comp['logrealpop'] = np.log10(pop_size)
-        binned_time = pd.cut(comp['norm_t'],30).apply(lambda x: np.round(x.mid,2))
-        comp['norm_t_binned'] = binned_time.astype(float)
-        
-        comp_reset = comp.reset_index()
-        data_dict[label]["data"] = comp_reset
-        maxt = comp_reset.groupby(['rep'])['t'].max()
-        maxdiff = comp_reset.groupby(['rep'])['diff'].max()
-        meddiff = maxdiff.median()
-        medt = maxt.median()
-        medoid = maxt.iloc[np.argmin((maxt-medt)**2+(maxdiff-meddiff)**2)]
-        """for i in med_df['rep'].unique():
-            data = comp_reset[comp_reset['rep']==i]
-            if i==0:
-                plt.plot(data['t'], data['log10_tf'], color = color, label = label)
-            else:
-                plt.plot(data['t'], data['log10_tf'], color = color)
-            #sns.lineplot(data = data, x = 'norm_t_binned', y = 'log10_tf', errorbar  = 'sd', label = label)"""
-        rep = comp_reset[comp_reset['t'] == medoid]['rep'].iloc[0]
-        data_dict[label]['chosen_rep'] = rep
-        print(rep)
-        data = comp_reset[comp_reset['rep']==rep]
-        dbar = (data.groupby(['t'])['cellhge'].sum()/data.groupby(['t'])['popsize'].sum()).reset_index()
-        
-        ax1.plot(data['t'], data['log10_tf'], color, linewidth = 2)
-        ax1.set_title("cfDNA tumor fraction")
-        #ax2.set_title("population size")
-        ax2.plot(data['t'], data['logrealpop'], color, label = f'{plotlabels[data_dict[label]["r"]]},{plotlabels[data_dict[label]["model"]]}', linewidth = 2)
-        ax21.plot(dbar['t'],dbar[0],color, label = f'{plotlabels[data_dict[label]["r"]]},{plotlabels[data_dict[label]["model"]]}', linewidth = 2)
-    plt.legend()
-    ax1.set_ylabel("log10")
-    ax1.set_xlabel("time (arbitrary units)")
-    plt.savefig("tumor_fraction_plot.png")
-    plt.savefig("tumor_fraction_plot.pdf")
-    
-    plt.show(block = False)
 
 def make_diff_plots(data_dict, min_t = 0, nbins = 100, xname = "realpop"):
     for label in data_dict.keys():
@@ -485,10 +429,39 @@ def make_vaf_centroid_plot(data_dict, min_t = 100, outdir = 'fig-data',threshold
             plt.yticks(fontsize = 'xx-large')
             #plt.savefig(f"{outdir}/vaf-snapshot-{label}-{thresh}.pdf")
             plt.show()
-           
 
-def load_data_files(selection = "birthbased", calibration_tumor_fraction = 1e-2):
-    #set_tf = (estimate_3d_population(DETECT_SIZE_VOXELS))*SHED_RATE*0.1/(33.3)/TOTAL_HGE
+def plot_max_diff():
+    d1 = np.linspace(0,1,1001,endpoint = True)
+    d2 = np.linspace(0,1,1001, endpoint = True)
+    N = 1
+    def get_z(d1, d2):
+        return (np.sqrt(d2)-np.sqrt(d1))/(np.sqrt(d2)+np.sqrt(d1))
+        
+    z = np.zeros((len(d1), len(d2)))
+    for i, d1i in enumerate(d1):
+        for j, d2j in enumerate(d2):
+            z[i,j] = get_z(d1i, d2j) if j > i else None 
+    d1 = np.round(d1,2)
+    x = [None for i in range(len(d1))]
+    x[0] = d1[0]
+    x[250] = d1[250]
+    x[500] = d1[500]
+    x[750] = d1[750]
+    x[-1] = d1[-1]
+    plot_mat = np.flip(z.T,0)
+
+    sns.heatmap(plot_mat, cmap = 'viridis',square = True,vmin = 0, vmax = 1)
+    plt.xlabel(r'$d_1$')
+    plt.ylabel(r'$d_2$')
+    tickmarks = np.array([0,250,500,750,1000])
+
+    plt.xticks(tickmarks,tickmarks/1000,rotation = 0,fontsize = 'xx-large')
+    plt.yticks(tickmarks[::-1],tickmarks/1000, fontsize = 'xx-large')
+    plt.savefig('max_diff.png')
+    plt.savefig('max_diff.pdf')
+    plt.show()           
+
+def load_data_files(selection = "birthbased", calibration_tumor_fraction = 1e-2, infer_VAFs = True, data_path = "fig-data"):
     set_tf = calibration_tumor_fraction
     sr = estimate_shedding_rate(set_tf)
     print(f"estimated_shedding_rate = {sr}")
@@ -498,98 +471,46 @@ def load_data_files(selection = "birthbased", calibration_tumor_fraction = 1e-2)
         for r in [20,60]:
             for model in ["q","nq"]:
                 label = f'{selection}-driv-{dependence}-r-{r}-{model}'
-                datadir = f'figure-data/{label}'
+                datadir = f'{data_path}/{label}'
                 readin = pd.read_csv(f'{datadir}/results.csv', index_col = [0])
                 data_dict[label] = {"datadir":datadir, "data": readin}
                 data_dict[label]['model'] = model
                 data_dict[label]['r'] = r
                 print(f'loaded {label}')
-    print("inferring tumor fraction and VAFs")
-    for label in data_dict.keys():
-        comp = data_dict[label]["data"]
+    if infer_VAFs:
+        print("inferring tumor fraction and VAFs")
+        for label in data_dict.keys():
+            comp = data_dict[label]["data"]
+            
+            # get the index of median column in the original dataframe
         
-        # get the index of median column in the original dataframe
-    
-        pop_size = estimate_3d_population(comp.reset_index().groupby(['rep','t'])['popsize'].sum()).reset_index().set_index(['rep','t'])#replace with med_df for normalized time plots
-        tfs = calc_tumor_fraction(comp, sr)
-        tf_col = tfs[['rep','t','n_hge','tf']].set_index(['rep','t'])
-        comp = comp.set_index(['rep','t'])
-        comp[['n_hge','tf']] = tf_col
-        comp['log10_n_hge'] = np.log10(comp['n_hge'])
-        comp['log10_tf'] = np.log10(comp['tf'])
-        comp['realpop'] = pop_size
-        comp['logrealpop'] = np.log10(pop_size)
-        binned_time = pd.cut(comp['norm_t'],30).apply(lambda x: np.round(x.mid,2))
-        comp['norm_t_binned'] = binned_time.astype(float)
-        
-        comp_reset = comp.reset_index()
-        data_dict[label]["data"] = comp_reset
-        #tdiag = get_time_of_diag(comp)
-        data_dict[label]['shedrates'] = sr
-        df = data_dict[label]["data"]
-        #df.to_csv(f'{data_dict[label]["datadir"]}/comp-tfs.csv')
-        original_vafs = clones_to_vafs(df)
-        vafs = resample_blood_vafs(original_vafs, df, ml_blood_draw = 15, set_tf = set_tf)
-        data_dict[label]['vafs'] = vafs
-        #print(f"writing {label} to files")
-        #vafs.to_csv(f'{data_dict[label]["datadir"]}/comp-vafs.csv')
+            pop_size = estimate_3d_population(comp.reset_index().groupby(['rep','t'])['popsize'].sum()).reset_index().set_index(['rep','t'])#replace with med_df for normalized time plots
+            tfs = calc_tumor_fraction(comp, sr)
+            tf_col = tfs[['rep','t','n_hge','tf']].set_index(['rep','t'])
+            comp = comp.set_index(['rep','t'])
+            comp[['n_hge','tf']] = tf_col
+            comp['log10_n_hge'] = np.log10(comp['n_hge'])
+            comp['log10_tf'] = np.log10(comp['tf'])
+            comp['realpop'] = pop_size
+            comp['logrealpop'] = np.log10(pop_size)
+            binned_time = pd.cut(comp['norm_t'],30).apply(lambda x: np.round(x.mid,2))
+            comp['norm_t_binned'] = binned_time.astype(float)
+            
+            comp_reset = comp.reset_index()
+            data_dict[label]["data"] = comp_reset
+            #tdiag = get_time_of_diag(comp)
+            data_dict[label]['shedrates'] = sr
+            df = data_dict[label]["data"]
+            #df.to_csv(f'{data_dict[label]["datadir"]}/comp-tfs.csv')
+            original_vafs = clones_to_vafs(df)
+            vafs = resample_blood_vafs(original_vafs, df, ml_blood_draw = 15, set_tf = set_tf)
+            data_dict[label]['vafs'] = vafs
+            #print(f"writing {label} to files")
+            #vafs.to_csv(f'{data_dict[label]["datadir"]}/comp-vafs.csv')
 
     print("done")
     return data_dict
 
-def centroid_vaf_plot(comp, vafs):
-    pass#merged = pd.merge(vafs, comp, how = 'left', on = 'drivers',
-
-def load_data_files_birthbased():
-    print("loading data")
-    data_dict = {}
-    for r in [20,60]:
-        for model in ["q","nq"]:
-            label = f'r-{r}-{model}-d' #easier labeling than "experiment1"
-            datadir = f'/home/trachman/sim2/treatment-based/experiment1/analysis-{f"r-{r}-{model}"}/'
-            comptfs = pd.read_csv(f'{datadir}/comp-tfs.csv')
-            vafs =  pd.read_csv(f'{datadir}/comp-vafs.csv')
-            data_dict[label] = {"datadir":datadir, "data": comptfs, "vafs": vafs}
-            data_dict[label]['model'] = model
-            data_dict[label]['r'] = r
-            print(f"loaded {label}")
-    for r in [20,60]:
-        for model in ["q","nq"]:
-            label = f'r-{r}-{model}-i'
-            datadir = f'/home/trachman/sim2/treatment-based/experiment3/analysis-{f"r-{r}-{model}"}/'
-            comptfs = pd.read_csv(f'{datadir}/comp-tfs.csv')
-            vafs =  pd.read_csv(f'{datadir}/comp-vafs.csv')
-            data_dict[label] = {"datadir":datadir, "data": comptfs, "vafs": vafs}
-            data_dict[label]['model'] = model
-            data_dict[label]['r'] = r
-            print(f"loaded {label}")
-    print("done")
-    return data_dict
-def load_data_files_deathbased():
-    print("loading data")
-    data_dict = {}
-    for r in [20,60]:
-        for model in ["q","nq"]:
-            label = f'death-r-{r}-{model}-d' 
-            datadir = f'/home/trachman/sim2/treatment-based/experiment2/analysis-{f"r-{r}-{model}"}/'
-            comptfs = pd.read_csv(f'{datadir}/comp-tfs.csv')
-            vafs =  pd.read_csv(f'{datadir}/comp-vafs.csv')
-            data_dict[label] = {"datadir":datadir, "data": comptfs, "vafs": vafs}
-            data_dict[label]['model'] = model
-            data_dict[label]['r'] = r
-            print(f"loaded {label}")
-    for r in [20,60]:
-        for model in ["q","nq"]:
-            label = f'death-r-{r}-{model}-i'
-            datadir = f'/home/trachman/sim2/treatment-based/experiment4/analysis-{f"r-{r}-{model}"}/'
-            comptfs = pd.read_csv(f'{datadir}/comp-tfs.csv')
-            vafs =  pd.read_csv(f'{datadir}/comp-vafs.csv')
-            data_dict[label] = {"datadir":datadir, "data": comptfs, "vafs": vafs}
-            data_dict[label]['model'] = model
-            data_dict[label]['r'] = r
-            print(f"loaded {label}")
-    print("done")
-    return data_dict
 def test_load():
     print("loading data")
     data_dict = {}
@@ -605,7 +526,7 @@ def test_load():
 
 if __name__ == "__main__":
     #make_data_files()
-    data_dict = load_data_files_deathbased()
+    data_dict = load_data_files()
 
     make_diversity_plots(data_dict, min_t = 0, nbins = 50, xname = "norm_t")
     make_diff_plots(data_dict, min_t = 0, nbins = 50, xname = "norm_t")

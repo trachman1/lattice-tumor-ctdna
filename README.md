@@ -1,6 +1,6 @@
 # lattice-tumor-ctdna
 ## This repo includes the code used to generate the results in our paper:
-dependencies: `python3 v11, numpy, pandas, matplotlib, seaborn` 
+dependencies: `python 3.11, numpy, scipy, pandas, matplotlib, seaborn` 
 ## Tumor simulation code:
 `classes.py`: class definitions for the lattice simulation\
 `main.py`: wrapper functions to configure parameters and call the simulator\
