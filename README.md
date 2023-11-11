@@ -2,11 +2,11 @@
 ## This repo includes the code used to generate the results in our paper: "Modeling the effect of spatial structure on solid tumor evolution2and ctDNA composition" 
 ### Thomas Rachman, David Bartlett, William LaFramboise, Patrick Wagner, Oana Carja 
 ## Tumor simulation code:
-### dependencies: `python 3.11, numpy, scipy, pandas, matplotlib, seaborn` 
+ dependencies: `python 3.11, numpy, scipy, pandas, matplotlib, seaborn` \
 `classes.py`: class definitions for the lattice simulation\
 `main.py`: wrapper functions to configure parameters and call the simulator\
 `utils.py`: various helper functions and plotters\
-`demo.ipynb`: notebook showing an example run of the simulator and the resulting trajectory of ctDNA, tissue clone fractions and overall population. The results are stored in `demo-output`. The file `simulation-results.csv` contain data for each individual cell at each saved timepoint. The file `demo-output/postprocessed/postprocessed.csv` summarizes the results for each clone as described in the Data section. 
+`demo.ipynb`: notebook showing an example run of the simulator and the resulting trajectory of ctDNA, tissue clone fractions and overall population. The results are stored in `demo-output`. The file `simulation-results.csv` contain data for each individual cell at each saved timepoint. The file `demo-output/postprocessed/postprocessed.csv` summarizes the results for each clone in the same way described in the Data section. 
 ## Code to reproduce figures:
 `make_figs.py`: code to produce subfigures used in all results and supplementary material\
 `code-for-figures.ipynb`: notebook that loads raw data and runs the methods in `make_figs.py` to produce all subfigures. 
@@ -34,9 +34,9 @@ The columns are:\
 	**norm_t**: normalized timestamp\
 	**norm_t_binned**: binned normalized timestamp\
 	**r_mean**: mean radius of clone from tumor center\
-	**r_std**: standard deviation of clone from tumor center\
-	**centroid_x**: the mean x coordinate of the tumor clone\
-	**centroid_y**: the mean y coordinate of the tumor clone\
-	**centroid_r**: the mean displacement of the tumor clone from the center\ 
-	**norm_age**: normalized age of clone\
-	**drivers**: tuple of driver mutation IDs in this clone\
+	**r_std**: standard deviation of clone from tumor center \
+	**centroid_x**: the mean x coordinate of the tumor clone \
+	**centroid_y**: the mean y coordinate of the tumor clone \
+	**centroid_r**: the mean displacement of the tumor clone from the center   \ 
+	**norm_age**: normalized age of clone \
+	**drivers**: tuple of driver mutation IDs in this clone \
