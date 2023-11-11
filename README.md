@@ -1,5 +1,6 @@
 # lattice-tumor-ctdna
-## This repo includes the code used to generate the results in our paper:
+## This repo includes the code used to generate the results in our paper: "Modeling the effect of spatial structure on solid tumor evolution2and ctDNA composition" 
+### Thomas Rachman, David Bartlett, William LaFramboise, Patrick Wagner, Oana Carja 
 dependencies: `python 3.11, numpy, scipy, pandas, matplotlib, seaborn` 
 ## Tumor simulation code:
 `classes.py`: class definitions for the lattice simulation\
