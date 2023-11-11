@@ -1,6 +1,13 @@
-# lattice-tumor-ctdna
-## This repo includes the code used to generate the results in the paper: "Modeling the effect of spatial structure on solid tumor evolution and ctDNA composition" 
-### Thomas Rachman, David Bartlett, William LaFramboise, Patrick Wagner, Oana Carja 
+
+### Modeling the effect of spatial structure on solid tumor evolution and ctDNA composition 
+Thomas Rachman<sup>1,2</sup>, David Bartlett<sup>3</sup>, William Laframboise<sup>3</sup>, Patrick Wagner<sup>3</sup>, Russell Schwartz<sup>1</sup>, Oana Carja<sup>1</sup> 
+
+<sup>1</sup>Computational Biology Department, School of Computer Science, Carnegie Mellon University, Pittsburgh, PA, USA;
+<sup>2</sup>Joint Carnegie Mellon University-University of Pittsburgh Ph.D. Program in Computational Biology;
+<sup>3</sup>Allegheny Cancer Institute, Allegheny Health Network, Pittsburgh PA
+
+### Abstract
+Circulating tumor DNA (ctDNA) monitoring, while sufficiently advanced to reflect tumor evolution in real time and inform on cancer diagnosis, treatment, and prognosis, mainly relies on DNA that originates from cell death via apoptosis or necrosis. In solid tumors, chemotherapy and immune infiltration can induce spatially variable rates of cell death, with the potential to bias and distort the clonal composition of ctDNA. Using a stochastic evolutionary model of boundary-driven growth, we study how elevated cell death on the edge of a tumor can simultaneously impact driver mutation accumulation and the representation of tumor clones and mutation detectability in ctDNA. We describe conditions in which invasive clones end up over-represented in ctDNA, clonal diversity can appear elevated in the blood, and spatial bias in shedding can inflate subclonal variant allele frequencies (VAFs). Additionally, we find that tumors that are mostly quiescent can display similar biases, but are far less detectable, and the extent of perceptible spatial bias strongly depends on sequence detection limits. Overall, we show that spatially structured shedding might cause liquid biopsies to provide highly biased profiles of tumor state.  While this may enable more sensitive detection of expanding clones, it could also increase the risk of targeting a subclonal variant for treatment. Our results indicate that the effects and clinical consequences of spatially variable cell death on ctDNA composition present an important area for future work.
 ## Tumor simulation code:
  dependencies: `python 3.11, numpy, scipy, pandas, matplotlib, seaborn` \
 `classes.py`: class definitions for the lattice simulation\
